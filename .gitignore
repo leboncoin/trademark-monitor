@@ -1,6 +1,7 @@
 # User Files
 config.ini
 *.DS_Store
+env3
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
