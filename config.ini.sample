@@ -1,0 +1,18 @@
+[DEFAULT]
+CONSUMER_KEY =
+CONSUMER_SECRET =
+ACCESS_TOKEN =
+ACCESS_TOKEN_SECRET =
+
+[MAIL]
+IS_ENABLED = True
+DEST_EMAIL = sample@sample.com
+SUBJECT_EMAIL = Twitter - New Trademark Tweet Detected
+SMTP_SERVER = smtp.gmail.com
+SMTP_PORT = 465
+SMTP_EMAIL = sample@gmail.com
+SMTP_PASSWORD =
+
+[DETECTION]
+TRADEMARKS = leboncoin
+WORDLIST = phishing attack scam
