@@ -14,5 +14,5 @@ SMTP_EMAIL = sample@gmail.com
 SMTP_PASSWORD =
 
 [DETECTION]
-TRADEMARKS = leboncoin
+TRADEMARKS = leboncoin,largus
 WORDLIST = phishing attack scam
