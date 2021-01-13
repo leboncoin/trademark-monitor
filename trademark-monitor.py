@@ -13,7 +13,9 @@ import json
 import smtplib
 import ssl
 import configparser
+import logging
 
+from requests import Session
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
@@ -24,6 +26,11 @@ from tweepy.streaming import StreamListener
 config = configparser.ConfigParser()
 config.read('config.ini')
 
+logging.basicConfig()
+LOGGER = logging.getLogger('trademark-monitor')
+
+SESSION = Session()
+
 CONSUMER_KEY=config['DEFAULT']['CONSUMER_KEY']
 CONSUMER_SECRET=config['DEFAULT']['CONSUMER_SECRET']
 ACCESS_TOKEN=config['DEFAULT']['ACCESS_TOKEN']
@@ -33,6 +40,58 @@ TRADEMARKS = config['DETECTION']['TRADEMARKS']
 WORDLIST = config['DETECTION']['WORDLIST']
 
 TWEETS_ID_LIST = []
+
+SLACK_COLOR_MAPPING = {
+    'info': '#b4c2bf',
+    'low': '#4287f5',
+    'medium': '#f5a742',
+    'high': '#b32b2b',
+}
+
+def safe_url(text):
+    '''Returns a safe unclickable link'''
+    return text.replace('http:', 'hxxp:').replace('https:', 'hxxps:').replace('.', '[.]')
+
+def slack_alert_twitter(id_tweet, author, content, criticity='high', test_only=False):
+    '''Post report on Slack'''
+    payload = dict()
+    payload['channel'] = config['SLACK']['CHANNEL']
+    payload['link_names'] = 1
+    payload['username'] = config['SLACK']['USERNAME']
+    payload['icon_emoji'] = config['SLACK']['EMOJI']
+    attachments = dict()
+    attachments['color'] = SLACK_COLOR_MAPPING[criticity]
+    attachments['blocks'] = [
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "{}".format(safe_url(content))
+                }
+        },
+        {
+            "type": "actions",
+            "elements": [
+                {
+                    "type": "button",
+                    "text": {
+                        "type": "plain_text",
+                        "emoji": True,
+                        "text": "Tweet Link"
+                    },
+                    "style": "primary",
+                    "url": 'https://twitter.com/{}/status/{}'.format(author, id_tweet)
+                }
+            ]
+        }
+    ]
+    payload['attachments'] = [attachments]
+    if test_only:
+        LOGGER.warning('[TEST-ONLY] Slack alert.')
+        LOGGER.warning(payload)
+        return True
+    response = SESSION.post(config['SLACK']['WEBHOOK'], data=json.dumps(payload))
+    return response.ok
 
 def send_mail(to_email, content):
     '''Send a mail'''
@@ -53,6 +112,35 @@ def send_mail(to_email, content):
             config['MAIL']['SMTP_EMAIL'], to_email, message.as_string()
         )
 
+def twitter_send_mail(json_data):
+    '''Send mail if enabled in the config file'''
+    if config['MAIL']['IS_ENABLED'] == 'True':
+        content = json_data['extended_tweet']['full_text'] if 'extended_tweet' in json_data else json_data['text']
+        verified_or_not = 'YES' if json_data['user']['verified'] == True else 'NO'
+        send_mail(config['MAIL']['DEST_EMAIL'], "FROM: @{}\r\n" \
+            "TEXT: {}\r\n" \
+            "TWEET DATE: {}\r\n" \
+            "LINK: https://twitter.com/{}/status/{}\r\n" \
+            "VERIFIED ACCOUNT: {}\r\n" \
+            "FOLLOWERS: {}"
+                .format(json_data['user']['screen_name'], safe_url(content),
+                json_data['created_at'], json_data['user']['screen_name'], json_data['id'], verified_or_not, json_data['user']['followers_count']))
+
+def twitter_send_slack_notif(json_data):
+    '''Send slack notifications if enabled in the config file'''
+    if config['TWITTER']['SLACK_NOTIFICATIONS_ENABLED'] == 'True':
+        content = json_data['extended_tweet']['full_text'] if 'extended_tweet' in json_data else json_data['text']
+        verified_or_not = ':twitter_verified:' if json_data['user']['verified'] == True else ''
+        criticity = 'high' if json_data['user']['verified'] == True else 'medium'
+        slack_alert_twitter(json_data['id'], json_data['user']['screen_name'],
+            "*FROM*: @{}\r\n" \
+            "*TEXT*: {}\r\n" \
+            "*TWEET DATE*: {}\r\n" \
+            "*VERIFIED ACCOUNT*: {}\r\n" \
+            "*FOLLOWERS*: {}"
+                .format(json_data['user']['screen_name'], content,
+                json_data['created_at'], verified_or_not, json_data['user']['followers_count']), criticity)
+
 class TwitterListener(StreamListener):
     '''Class listening the data of the Twitter Stream'''
     def on_data(self, data):
@@ -60,22 +148,18 @@ class TwitterListener(StreamListener):
         obj = json.loads(data)
         words = WORDLIST.split()
         if not obj['text'].startswith('RT'):
-            print(obj['text'])
             for word in words:
                 if word in obj['text'] and obj['id'] not in TWEETS_ID_LIST:
-                    print('============= FROM: @{} ============='
+                    LOGGER.warning('============= FROM: @{} ============='
                             .format(obj['user']['screen_name']))
-                    print(obj['text'])
-                    print('TWEET DATE: {}'.format(obj['created_at']))
-                    print('LINK: https://twitter.com/{}/status/{}'.format(obj['user']['screen_name'], obj['id']))
+                    LOGGER.warning(obj['text'])
+                    LOGGER.warning('TWEET DATE: {}'.format(obj['created_at']))
+                    LOGGER.warning('LINK: https://twitter.com/{}/status/{}'.format(obj['user']['screen_name'], obj['id']))
+                    # Alerting
+                    twitter_send_mail(obj)
+                    twitter_send_slack_notif(obj)
+
                     TWEETS_ID_LIST.append(obj['id'])
-                    if config['MAIL']['IS_ENABLED']:
-                        send_mail(config['MAIL']['DEST_EMAIL'], "FROM: @{}\r\n" \
-                            "TEXT: {}\r\n" \
-                            "TWEET DATE: {}\r\n" \
-                            "LINK: https://twitter.com/{}/status/{}"
-                                .format(obj['user']['screen_name'], obj['text'],
-                                obj['created_at'], obj['user']['screen_name'], obj['id']))
             if len(TWEETS_ID_LIST) > 1000:
                 TWEETS_ID_LIST.clear()
 
@@ -84,9 +168,8 @@ def main():
     try:
         auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
         auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
-
         while True:
-            print('Twitter stream started...')
+            LOGGER.warning('Twitter stream started...')
             stream = Stream(auth, TwitterListener())
             stream.filter(track=[TRADEMARKS])
     except Exception:
