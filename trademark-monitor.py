@@ -15,10 +15,10 @@ import ssl
 import configparser
 import logging
 
-from requests import Session
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+from requests import Session
 import tweepy
 from tweepy import Stream
 from tweepy.streaming import StreamListener
