@@ -66,7 +66,7 @@ def slack_alert_twitter(id_tweet, author, content, criticity='high', test_only=F
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": "{}".format(safe_url(content))
+                "text": f"{safe_url(content)}"
                 }
         },
         {
@@ -80,7 +80,7 @@ def slack_alert_twitter(id_tweet, author, content, criticity='high', test_only=F
                         "text": "Tweet Link"
                     },
                     "style": "primary",
-                    "url": 'https://twitter.com/{}/status/{}'.format(author, id_tweet)
+                    "url": f'https://twitter.com/{author}/status/{id_tweet}'
                 }
             ]
         }
@@ -117,14 +117,12 @@ def twitter_send_mail(json_data):
     if config['MAIL']['IS_ENABLED'] == 'True':
         content = json_data['extended_tweet']['full_text'] if 'extended_tweet' in json_data else json_data['text']
         verified_or_not = 'YES' if json_data['user']['verified'] else 'NO'
-        send_mail(config['MAIL']['DEST_EMAIL'], "FROM: @{}\r\n" \
-            "TEXT: {}\r\n" \
-            "TWEET DATE: {}\r\n" \
-            "LINK: https://twitter.com/{}/status/{}\r\n" \
-            "VERIFIED ACCOUNT: {}\r\n" \
-            "FOLLOWERS: {}"
-                .format(json_data['user']['screen_name'], safe_url(content),
-                json_data['created_at'], json_data['user']['screen_name'], json_data['id'], verified_or_not, json_data['user']['followers_count']))
+        send_mail(config['MAIL']['DEST_EMAIL'], f"FROM: @{json_data['user']['screen_name']}\r\n" \
+            f"TEXT: {safe_url(content)}\r\n" \
+            f"TWEET DATE: {json_data['created_at']}\r\n" \
+            f"LINK: https://twitter.com/{json_data['user']['screen_name']}/status/{json_data['id']}\r\n" \
+            f"VERIFIED ACCOUNT: {verified_or_not}\r\n" \
+            f"FOLLOWERS: {json_data['user']['followers_count']}")
 
 def twitter_send_slack_notif(json_data):
     '''Send slack notifications if enabled in the config file'''
@@ -133,12 +131,11 @@ def twitter_send_slack_notif(json_data):
         verified_or_not = ' :twitter_verified:' if json_data['user']['verified'] else ''
         criticity = 'high' if json_data['user']['verified'] else 'medium'
         slack_alert_twitter(json_data['id'], json_data['user']['screen_name'],
-            "*FROM*: @{}{}\r\n" \
-            "*TEXT*: {}\r\n" \
-            "*TWEET DATE*: {}\r\n" \
-            "*FOLLOWERS*: {}"
-                .format(json_data['user']['screen_name'], verified_or_not, content,
-                json_data['created_at'], json_data['user']['followers_count']), criticity)
+            f"*FROM*: @{json_data['user']['screen_name']}{verified_or_not}\r\n" \
+            f"*TEXT*: {content}\r\n" \
+            f"*TWEET DATE*: {json_data['created_at']}\r\n" \
+            f"*FOLLOWERS*: {json_data['user']['followers_count']}",
+            criticity)
 
 class TwitterListener(StreamListener):
     '''Class listening the data of the Twitter Stream'''
@@ -149,11 +146,10 @@ class TwitterListener(StreamListener):
         if not obj['text'].startswith('RT'):
             for word in words:
                 if word in obj['text'] and obj['id'] not in TWEETS_ID_LIST:
-                    LOGGER.warning('============= FROM: @{} ============='
-                            .format(obj['user']['screen_name']))
+                    LOGGER.warning(f"============= FROM: @{obj['user']['screen_name']} =============")
                     LOGGER.warning(obj['text'])
-                    LOGGER.warning('TWEET DATE: {}'.format(obj['created_at']))
-                    LOGGER.warning('LINK: https://twitter.com/{}/status/{}'.format(obj['user']['screen_name'], obj['id']))
+                    LOGGER.warning(f"TWEET DATE: {obj['created_at']}")
+                    LOGGER.warning(f"LINK: https://twitter.com/{obj['user']['screen_name']}/status/{obj['id']}")
                     # Alerting
                     twitter_send_mail(obj)
                     twitter_send_slack_notif(obj)
