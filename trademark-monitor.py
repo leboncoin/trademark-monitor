@@ -15,10 +15,10 @@ import ssl
 import configparser
 import logging
 
-from requests import Session
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+from requests import Session
 import tweepy
 from tweepy import Stream
 from tweepy.streaming import StreamListener
@@ -50,7 +50,7 @@ SLACK_COLOR_MAPPING = {
 
 def safe_url(text):
     '''Returns a safe unclickable link'''
-    return text.replace('http:', 'hxxp:').replace('https:', 'hxxps:').replace('.', '[.]')
+    return text.replace('http:', 'hxxp:').replace('https:', 'hxxps:')
 
 def slack_alert_twitter(id_tweet, author, content, criticity='high', test_only=False):
     '''Post report on Slack'''
@@ -116,7 +116,7 @@ def twitter_send_mail(json_data):
     '''Send mail if enabled in the config file'''
     if config['MAIL']['IS_ENABLED'] == 'True':
         content = json_data['extended_tweet']['full_text'] if 'extended_tweet' in json_data else json_data['text']
-        verified_or_not = 'YES' if json_data['user']['verified'] == True else 'NO'
+        verified_or_not = 'YES' if json_data['user']['verified'] else 'NO'
         send_mail(config['MAIL']['DEST_EMAIL'], "FROM: @{}\r\n" \
             "TEXT: {}\r\n" \
             "TWEET DATE: {}\r\n" \
@@ -130,16 +130,15 @@ def twitter_send_slack_notif(json_data):
     '''Send slack notifications if enabled in the config file'''
     if config['TWITTER']['SLACK_NOTIFICATIONS_ENABLED'] == 'True':
         content = json_data['extended_tweet']['full_text'] if 'extended_tweet' in json_data else json_data['text']
-        verified_or_not = ':twitter_verified:' if json_data['user']['verified'] == True else ''
-        criticity = 'high' if json_data['user']['verified'] == True else 'medium'
+        verified_or_not = ' :twitter_verified:' if json_data['user']['verified'] else ''
+        criticity = 'high' if json_data['user']['verified'] else 'medium'
         slack_alert_twitter(json_data['id'], json_data['user']['screen_name'],
-            "*FROM*: @{}\r\n" \
+            "*FROM*: @{}{}\r\n" \
             "*TEXT*: {}\r\n" \
             "*TWEET DATE*: {}\r\n" \
-            "*VERIFIED ACCOUNT*: {}\r\n" \
             "*FOLLOWERS*: {}"
-                .format(json_data['user']['screen_name'], content,
-                json_data['created_at'], verified_or_not, json_data['user']['followers_count']), criticity)
+                .format(json_data['user']['screen_name'], verified_or_not, content,
+                json_data['created_at'], json_data['user']['followers_count']), criticity)
 
 class TwitterListener(StreamListener):
     '''Class listening the data of the Twitter Stream'''
