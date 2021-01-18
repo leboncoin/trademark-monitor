@@ -55,7 +55,6 @@ def filters(id_trademark):
     '''filters by trademark id'''
     trademark = database.get_trademark_by_id(id_trademark)
     keywords = database.get_keywords_by_trademark_id(id_trademark)
-    print(keywords)
     return render_template('filters.html', trademark=trademark, keywords=keywords)
 
 @app.route('/trademark/<int:id_trademark>/keywords/add', methods=['POST'])
@@ -84,5 +83,10 @@ def keywords_edit_id(id_trademark, id_keyword):
     keyword_edit = database.get_keyword_by_id(id_keyword)
     return render_template('filters.html',
                 trademark=trademark, keywords=keywords, keyword_edit=keyword_edit)
+
+@app.route('/logs', methods=['GET'])
+def logs():
+    '''logs'''
+    return render_template('logs.html', twitterlogs=database.get_twitter_logs())
 
 Bootstrap(app)
