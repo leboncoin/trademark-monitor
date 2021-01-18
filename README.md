@@ -13,6 +13,7 @@ Actually, only Twitter is monitored and more social networks will be added later
 * Start the monitor script: `python3 trademark-python.py`
 
 ## Next features
+* Add the possibility to remove a trademark / keyword
 * Add the possibility to ignore spam tweets
 * Add more filters options
 * Use an ORM for the database classes
