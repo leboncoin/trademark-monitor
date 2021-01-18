@@ -1,0 +1,58 @@
+<!--
+MIT License
+Copyright (c) 2021 Leboncoin
+Written by Yann Faure (yann.faure@adevinta.com)
+-->
+
+{% extends "bootstrap/base.html" %}
+{% block html_attribs %} lang="en"{% endblock %}
+{% block title %}Trademark Monitor{% endblock %}
+{% block styles %}
+{{super()}}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css">
+{% endblock %}
+
+{% block content %}
+    {% include 'navbar.html' %}
+
+    {% if keyword_edit %}
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-12">
+            <h1 class="text-center">Edit {{ keyword_edit[0][2] }}</h1>
+            <form class="text-center" method="POST" action="/trademark/{{ trademark[0][0] }}/keywords/edit/{{keyword_edit[0][0]}}">
+              <div class="form-group">
+                <input name="keyword" type="text" class="form-control" placeholder="{{ keyword_edit[0][2] }}">
+              </div>
+              <button class="btn btn-primary mb-2 float-right">Edit</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+    <div class="container">
+      <div class="row">
+        <div class="col-lg-6">
+          <h2 class="text-center">Add a keyword for {{ trademark[0][1] }}</h2>
+          <form method="POST" action="/trademark/{{ trademark[0][0] }}/keywords/add">
+            <div class="form-group">
+              <input name="keyword" type="text" class="form-control" placeholder="Keyword...">
+            </div>
+            <button class="btn btn-primary mb-2 float-right">Add</button>
+          </form>
+        </div>
+        <div class="col-lg-6">
+          <h2 class="text-center">Keywords</h2>
+          <div class="text-center">
+            {% for keyword in keywords %}
+              <p>{{ keyword[2] }} <a href="/trademark/{{ trademark[0][0] }}/keywords/edit/{{ keyword[0] }}"><i class="bi bi-pencil-square"></i></a> <a href="/trademark/{{ trademark[0][0] }}/keywords/delete/{{ keyword[0] }}"><i class="bi bi-trash-fill"></i></a></p></p>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+{{super()}}
+{% endblock %}
