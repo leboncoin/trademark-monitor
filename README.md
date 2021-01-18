@@ -16,6 +16,8 @@ Actually, only Twitter is monitored and more social networks will be added later
 * Add the possibility to remove a trademark / keyword
 * Add the possibility to ignore spam tweets
 * Add more filters options
+* Add an authent method
+* Clean the code for others developers
 * Use an ORM for the database classes
 * Edit the web interface to be more user friendly
 
