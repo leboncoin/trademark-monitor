@@ -20,6 +20,10 @@ class Database():
             (id INTEGER PRIMARY KEY, trademark TEXT NOT NULL);')
         self.database.exec('CREATE TABLE IF NOT EXISTS keywords \
             (id INTEGER PRIMARY KEY, id_trademark INTEGER NOT NULL, keyword TEXT NOT NULL);')
+        self.database.exec('CREATE TABLE IF NOT EXISTS twitterlogs \
+            (id INTEGER PRIMARY KEY, author TEXT NOT NULL, content TEXT NOT NULL, \
+            tweet_date TEXT NOT NULL, link TEXT NOT NULL, is_verified BOOLEAN NOT NULL, \
+            followers INTEGER NOT NULL);')
 
     # Trademarks
     def get_trademarks(self):
@@ -46,6 +50,10 @@ class Database():
                             (id_trademark,))
 
     # Keywords
+    def get_keywords(self):
+        '''Get all keywords'''
+        return self.database.fetchall('SELECT id, id_trademark, keyword FROM keywords')
+
     def get_keyword_by_id(self, id_keyword):
         '''Get keyword by id'''
         return self.database.fetchall('SELECT id, id_trademark, keyword FROM keywords \
@@ -69,3 +77,16 @@ class Database():
         '''Update keyword'''
         self.database.exec('UPDATE keywords SET keyword = ? WHERE id = ?',
                             (new_keyword_name, id_keyword,))
+
+    # Twitter Logs
+    def get_twitter_logs(self):
+        '''Get all twitter logs'''
+        return self.database.fetchall('SELECT id, author, content, tweet_date, \
+                                    link, is_verified, followers FROM twitterlogs')
+
+    def insert_twitter_logs(self, author, content, tweet_date, link, is_verified, followers):
+        '''Insert twitter logs'''
+        self.database.exec('INSERT INTO \
+            twitterlogs(author, content, tweet_date, link, is_verified, followers) \
+            VALUES (?, ?, ?, ?, ?, ?)',
+            (author, content, tweet_date, link, is_verified, followers,))
