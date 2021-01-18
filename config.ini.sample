@@ -13,10 +13,6 @@ SMTP_PORT = 465
 SMTP_EMAIL = sample@gmail.com
 SMTP_PASSWORD =
 
-[DETECTION]
-TRADEMARKS = leboncoin,largus
-WORDLIST = phishing attack scam
-
 [SLACK]
 WEBHOOK = 
 CHANNEL = 
