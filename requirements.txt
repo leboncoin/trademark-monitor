@@ -1,2 +1,4 @@
-tweepy==3.10.0
+tweepy>=3.10.0
 requests>=2.25.1
+Flask>=1.1.2
+Flask-Bootstrap4>=4.0.2

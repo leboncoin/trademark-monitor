@@ -23,6 +23,11 @@ import tweepy
 from tweepy import Stream
 from tweepy.streaming import StreamListener
 
+from classes.database import Database
+
+database = Database('database.db')
+database.init_databases()
+
 config = configparser.ConfigParser()
 config.read('config.ini')
 
@@ -35,9 +40,6 @@ CONSUMER_KEY=config['DEFAULT']['CONSUMER_KEY']
 CONSUMER_SECRET=config['DEFAULT']['CONSUMER_SECRET']
 ACCESS_TOKEN=config['DEFAULT']['ACCESS_TOKEN']
 ACCESS_TOKEN_SECRET=config['DEFAULT']['ACCESS_TOKEN_SECRET']
-
-TRADEMARKS = config['DETECTION']['TRADEMARKS']
-WORDLIST = config['DETECTION']['WORDLIST']
 
 TWEETS_ID_LIST = []
 
@@ -115,7 +117,8 @@ def send_mail(to_email, content):
 def twitter_send_mail(json_data):
     '''Send mail if enabled in the config file'''
     if config['MAIL']['IS_ENABLED'] == 'True':
-        content = json_data['extended_tweet']['full_text'] if 'extended_tweet' in json_data else json_data['text']
+        content = json_data['extended_tweet']['full_text'] if 'extended_tweet' \
+                        in json_data else json_data['text']
         verified_or_not = 'YES' if json_data['user']['verified'] else 'NO'
         send_mail(config['MAIL']['DEST_EMAIL'], f"FROM: @{json_data['user']['screen_name']}\r\n" \
             f"TEXT: {safe_url(content)}\r\n" \
@@ -127,7 +130,8 @@ def twitter_send_mail(json_data):
 def twitter_send_slack_notif(json_data):
     '''Send slack notifications if enabled in the config file'''
     if config['TWITTER']['SLACK_NOTIFICATIONS_ENABLED'] == 'True':
-        content = json_data['extended_tweet']['full_text'] if 'extended_tweet' in json_data else json_data['text']
+        content = json_data['extended_tweet']['full_text'] if 'extended_tweet' \
+                        in json_data else json_data['text']
         verified_or_not = ' :twitter_verified:' if json_data['user']['verified'] else ''
         criticity = 'high' if json_data['user']['verified'] else 'medium'
         slack_alert_twitter(json_data['id'], json_data['user']['screen_name'],
@@ -137,15 +141,25 @@ def twitter_send_slack_notif(json_data):
             f"*FOLLOWERS*: {json_data['user']['followers_count']}",
             criticity)
 
+def insert_tweet_to_database(json_data):
+    '''Insert found tweet in database'''
+    content = json_data['extended_tweet']['full_text'] if 'extended_tweet' \
+                        in json_data else json_data['text']
+    verified_or_not = 1 if json_data['user']['verified'] else 0
+    link = f"https://twitter.com/{json_data['user']['screen_name']}/status/{json_data['id']}"
+    database.insert_twitter_logs(
+        json_data['user']['screen_name'], safe_url(content),
+        json_data['created_at'], link, verified_or_not, json_data['user']['followers_count']
+    )
+
 class TwitterListener(StreamListener):
     '''Class listening the data of the Twitter Stream'''
     def on_data(self, data):
         '''Receiving data'''
         obj = json.loads(data)
-        words = WORDLIST.split()
         if not obj['text'].startswith('RT'):
-            for word in words:
-                if word in obj['text'] and obj['id'] not in TWEETS_ID_LIST:
+            for keyword in database.get_keywords():
+                if keyword[2] in obj['text'] and obj['id'] not in TWEETS_ID_LIST:
                     LOGGER.warning(f"============= FROM: @{obj['user']['screen_name']} =============")
                     LOGGER.warning(obj['text'])
                     LOGGER.warning(f"TWEET DATE: {obj['created_at']}")
@@ -153,6 +167,7 @@ class TwitterListener(StreamListener):
                     # Alerting
                     twitter_send_mail(obj)
                     twitter_send_slack_notif(obj)
+                    insert_tweet_to_database(obj)
 
                     TWEETS_ID_LIST.append(obj['id'])
             if len(TWEETS_ID_LIST) > 1000:
@@ -164,9 +179,12 @@ def main():
         auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
         auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
         while True:
-            LOGGER.warning('Twitter stream started...')
+            trademarks = ''
+            for trademark in database.get_trademarks():
+                trademarks += f"{trademark[1]}, "
+            LOGGER.warning(f"Twitter stream started with the trademarks: {trademarks[:-2]} ...")
             stream = Stream(auth, TwitterListener())
-            stream.filter(track=[TRADEMARKS])
+            stream.filter(track=[trademarks[:-2]])
     except Exception:
         pass
 

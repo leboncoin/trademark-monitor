@@ -1,0 +1,57 @@
+<!--
+MIT License
+Copyright (c) 2021 Leboncoin
+Written by Yann Faure (yann.faure@adevinta.com)
+-->
+
+{% extends "bootstrap/base.html" %}
+{% block html_attribs %} lang="en"{% endblock %}
+{% block title %}Trademark Monitor{% endblock %}
+{% block styles %}
+{{super()}}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css">
+{% endblock %}
+
+{% block content %}
+    {% include 'navbar.html' %}
+    {% if trademark_edit %}
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-12">
+            <h1 class="text-center">Edit {{ trademark_edit[0][1] }}</h1>
+            <form class="text-center" method="POST" action="/trademarks/edit/{{trademark_edit[0][0]}}">
+              <div class="form-group">
+                <input name="trademark" type="text" class="form-control" placeholder="{{ trademark_edit[0][1] }}">
+              </div>
+              <button class="btn btn-primary mb-2 float-right">Edit</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+    <div class="container">
+      <div class="row">
+        <div class="col-lg-6">
+          <h2 class="text-center">Add a trademark</h2>
+          <form method="POST" action="/trademarks/add">
+            <div class="form-group">
+              <input name="trademark" type="text" class="form-control" placeholder="Trademark name...">
+            </div>
+            <button class="btn btn-primary mb-2 float-right">Add</button>
+          </form>
+        </div>
+        <div class="col-lg-6">
+          <h2 class="text-center">Trademarks</h2>
+          <div class="text-center">
+            {% for trademark in trademarks %}
+              <p><a href="/filters/edit/{{ trademark[0] }}">{{ trademark[1] }}</a> <a href="/trademarks/edit/{{ trademark[0] }}"><i class="bi bi-pencil-square"></i></a> <a href="/trademarks/delete/{{ trademark[0] }}"><i class="bi bi-trash-fill"></i></a></p>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+{{super()}}
+{% endblock %}
