@@ -21,3 +21,8 @@ EMOJI = :wave:
 
 [TWITTER]
 SLACK_NOTIFICATIONS_ENABLED = True
+
+[STANDALONE]
+IS_ENABLED = False
+TRADEMARKS = leboncoin,largus
+KEYWORDS = phishing attack scam
