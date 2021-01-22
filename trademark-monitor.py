@@ -36,10 +36,10 @@ LOGGER = logging.getLogger('trademark-monitor')
 
 SESSION = Session()
 
-CONSUMER_KEY=config['DEFAULT']['CONSUMER_KEY']
-CONSUMER_SECRET=config['DEFAULT']['CONSUMER_SECRET']
-ACCESS_TOKEN=config['DEFAULT']['ACCESS_TOKEN']
-ACCESS_TOKEN_SECRET=config['DEFAULT']['ACCESS_TOKEN_SECRET']
+CONSUMER_KEY=config.get('DEFAULT', 'CONSUMER_KEY')
+CONSUMER_SECRET=config.get('DEFAULT', 'CONSUMER_SECRET')
+ACCESS_TOKEN=config.get('DEFAULT', 'ACCESS_TOKEN')
+ACCESS_TOKEN_SECRET=config.get('DEFAULT', 'ACCESS_TOKEN_SECRET')
 
 TWEETS_ID_LIST = []
 
@@ -57,10 +57,10 @@ def safe_url(text):
 def slack_alert_twitter(id_tweet, author, content, criticity='high', test_only=False):
     '''Post report on Slack'''
     payload = dict()
-    payload['channel'] = config['SLACK']['CHANNEL']
+    payload['channel'] = config.get('SLACK', 'CHANNEL')
     payload['link_names'] = 1
-    payload['username'] = config['SLACK']['USERNAME']
-    payload['icon_emoji'] = config['SLACK']['EMOJI']
+    payload['username'] = config.get('SLACK', 'USERNAME')
+    payload['icon_emoji'] = config.get('SLACK', 'EMOJI')
     attachments = dict()
     attachments['color'] = SLACK_COLOR_MAPPING[criticity]
     attachments['blocks'] = [
@@ -92,35 +92,36 @@ def slack_alert_twitter(id_tweet, author, content, criticity='high', test_only=F
         LOGGER.warning('[TEST-ONLY] Slack alert.')
         LOGGER.warning(payload)
         return True
-    response = SESSION.post(config['SLACK']['WEBHOOK'], data=json.dumps(payload))
+    response = SESSION.post(config.get('SLACK', 'WEBHOOK'), data=json.dumps(payload))
     return response.ok
 
 def send_mail(to_email, content):
     '''Send a mail'''
     message = MIMEMultipart("alternative")
-    message["Subject"] = config['MAIL']['SUBJECT_EMAIL']
-    message["From"] = config['MAIL']['SMTP_EMAIL']
+    message["Subject"] = config.get('MAIL', 'SUBJECT_EMAIL')
+    message["From"] = config.get('MAIL', 'SMTP_EMAIL')
     message["To"] = to_email
 
     message.attach(MIMEText(content, "plain"))
 
     context = ssl.create_default_context()
     with smtplib.SMTP_SSL(
-            config['MAIL']['SMTP_SERVER'], config['MAIL']['SMTP_PORT'],
+            config.get('MAIL', 'SMTP_SERVER'), config.get('MAIL', 'SMTP_PORT'),
             context=context
         ) as server:
-        server.login(config['MAIL']['SMTP_EMAIL'], config['MAIL']['SMTP_PASSWORD'])
+        server.login(config.get('MAIL', 'SMTP_EMAIL'), config.get('MAIL', 'SMTP_PASSWORD'))
         server.sendmail(
-            config['MAIL']['SMTP_EMAIL'], to_email, message.as_string()
+            config.get('MAIL', 'SMTP_EMAIL'), to_email, message.as_string()
         )
 
 def twitter_send_mail(json_data):
     '''Send mail if enabled in the config file'''
-    if config['MAIL']['IS_ENABLED'] == 'True':
+    if config.getboolean('MAIL', 'IS_ENABLED'):
         content = json_data['extended_tweet']['full_text'] if 'extended_tweet' \
                         in json_data else json_data['text']
         verified_or_not = 'YES' if json_data['user']['verified'] else 'NO'
-        send_mail(config['MAIL']['DEST_EMAIL'], f"FROM: @{json_data['user']['screen_name']}\r\n" \
+        send_mail(config.get('MAIL', 'DEST_EMAIL'),
+            f"FROM: @{json_data['user']['screen_name']}\r\n" \
             f"TEXT: {safe_url(content)}\r\n" \
             f"TWEET DATE: {json_data['created_at']}\r\n" \
             f"LINK: https://twitter.com/{json_data['user']['screen_name']}/status/{json_data['id']}\r\n" \
@@ -129,7 +130,7 @@ def twitter_send_mail(json_data):
 
 def twitter_send_slack_notif(json_data):
     '''Send slack notifications if enabled in the config file'''
-    if config['TWITTER']['SLACK_NOTIFICATIONS_ENABLED'] == 'True':
+    if config.getboolean('TWITTER', 'SLACK_NOTIFICATIONS_ENABLED'):
         content = json_data['extended_tweet']['full_text'] if 'extended_tweet' \
                         in json_data else json_data['text']
         verified_or_not = ' :twitter_verified:' if json_data['user']['verified'] else ''
@@ -158,8 +159,13 @@ class TwitterListener(StreamListener):
         '''Receiving data'''
         obj = json.loads(data)
         if not obj['text'].startswith('RT'):
-            for keyword in database.get_keywords():
-                if keyword[2] in obj['text'] and obj['id'] not in TWEETS_ID_LIST:
+            keywords = None
+            if not config.getboolean('STANDALONE', 'IS_ENABLED'):
+                keywords = database.get_keywords()
+            else:
+                keywords = config.get('STANDALONE', 'KEYWORDS').split()
+            for keyword in keywords:
+                if keyword[2].lower() in obj['text'].lower() and obj['id'] not in TWEETS_ID_LIST:
                     LOGGER.warning(f"============= FROM: @{obj['user']['screen_name']} =============")
                     LOGGER.warning(obj['text'])
                     LOGGER.warning(f"TWEET DATE: {obj['created_at']}")
@@ -180,12 +186,16 @@ def main():
         auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
         while True:
             trademarks = ''
-            for trademark in database.get_trademarks():
-                trademarks += f"{trademark[1]}, "
-            LOGGER.warning(f"Twitter stream started with the trademarks: {trademarks[:-2]} ...")
+            if not config.getboolean('STANDALONE', 'IS_ENABLED'):
+                for trademark in database.get_trademarks():
+                    trademarks += f"{trademark[1]}, "
+                trademarks = trademarks[:-2]
+            else:
+                trademarks = config.get('STANDALONE', 'TRADEMARKS')
+            LOGGER.warning(f"Twitter stream started with the trademarks: {trademarks} ...")
             stream = Stream(auth, TwitterListener())
-            stream.filter(track=[trademarks[:-2]])
-    except Exception:
+            stream.filter(track=[trademarks])
+    except Exception as ex:
         pass
 
 if __name__ == '__main__':
