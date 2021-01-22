@@ -195,7 +195,7 @@ def main():
             LOGGER.warning(f"Twitter stream started with the trademarks: {trademarks} ...")
             stream = Stream(auth, TwitterListener())
             stream.filter(track=[trademarks])
-    except Exception as ex:
+    except Exception:
         pass
 
 if __name__ == '__main__':
