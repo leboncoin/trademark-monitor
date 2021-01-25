@@ -163,7 +163,6 @@ class TwitterListener(StreamListener):
         '''Receiving data'''
         obj = json.loads(data)
         if not obj['text'].startswith('RT'):
-            keywords = None
             if not config.getboolean('STANDALONE', 'IS_ENABLED'):
                 keywords = database.get_keywords()
                 for keyword in keywords:
