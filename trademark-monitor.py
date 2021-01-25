@@ -152,6 +152,10 @@ def insert_tweet_to_database(json_data):
         json_data['user']['screen_name'], safe_url(content),
         json_data['created_at'], link, verified_or_not, json_data['user']['followers_count']
     )
+    LOGGER.warning(f"============= FROM: @{json_data['user']['screen_name']} =============")
+    LOGGER.warning(json_data['text'])
+    LOGGER.warning(f"TWEET DATE: {json_data['created_at']}")
+    LOGGER.warning(f"LINK: https://twitter.com/{json_data['user']['screen_name']}/status/{json_data['id']}")
 
 class TwitterListener(StreamListener):
     '''Class listening the data of the Twitter Stream'''
@@ -162,20 +166,20 @@ class TwitterListener(StreamListener):
             keywords = None
             if not config.getboolean('STANDALONE', 'IS_ENABLED'):
                 keywords = database.get_keywords()
+                for keyword in keywords:
+                    if keyword[2].lower() in obj['text'].lower() and obj['id'] not in TWEETS_ID_LIST:
+                        twitter_send_mail(obj)
+                        twitter_send_slack_notif(obj)
+                        insert_tweet_to_database(obj)
+                        TWEETS_ID_LIST.append(obj['id'])
             else:
                 keywords = config.get('STANDALONE', 'KEYWORDS').split()
-            for keyword in keywords:
-                if keyword[2].lower() in obj['text'].lower() and obj['id'] not in TWEETS_ID_LIST:
-                    LOGGER.warning(f"============= FROM: @{obj['user']['screen_name']} =============")
-                    LOGGER.warning(obj['text'])
-                    LOGGER.warning(f"TWEET DATE: {obj['created_at']}")
-                    LOGGER.warning(f"LINK: https://twitter.com/{obj['user']['screen_name']}/status/{obj['id']}")
-                    # Alerting
-                    twitter_send_mail(obj)
-                    twitter_send_slack_notif(obj)
-                    insert_tweet_to_database(obj)
-
-                    TWEETS_ID_LIST.append(obj['id'])
+                for keyword in keywords:
+                    if keyword.lower() in obj['text'].lower() and obj['id'] not in TWEETS_ID_LIST:
+                        twitter_send_mail(obj)
+                        twitter_send_slack_notif(obj)
+                        insert_tweet_to_database(obj)
+                        TWEETS_ID_LIST.append(obj['id'])
             if len(TWEETS_ID_LIST) > 1000:
                 TWEETS_ID_LIST.clear()
 
