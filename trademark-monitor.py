@@ -10,6 +10,7 @@ Written by Yann Faure (yann.faure@adevinta.com)
 '''
 
 import json
+import time
 import smtplib
 import ssl
 import configparser
@@ -31,7 +32,7 @@ database.init_databases()
 config = configparser.ConfigParser()
 config.read('config.ini')
 
-logging.basicConfig()
+logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger('trademark-monitor')
 
 SESSION = Session()
@@ -56,63 +57,69 @@ def safe_url(text):
 
 def slack_alert_twitter(id_tweet, author, content, criticity='high', test_only=False):
     '''Post report on Slack'''
-    payload = dict()
-    payload['channel'] = config.get('SLACK', 'CHANNEL')
-    payload['link_names'] = 1
-    payload['username'] = config.get('SLACK', 'USERNAME')
-    payload['icon_emoji'] = config.get('SLACK', 'EMOJI')
-    attachments = dict()
-    attachments['color'] = SLACK_COLOR_MAPPING[criticity]
-    attachments['blocks'] = [
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f"{safe_url(content)}"
-                }
-        },
-        {
-            "type": "actions",
-            "elements": [
-                {
-                    "type": "button",
-                    "text": {
-                        "type": "plain_text",
-                        "emoji": True,
-                        "text": "Tweet Link"
-                    },
-                    "style": "primary",
-                    "url": f'https://twitter.com/{author}/status/{id_tweet}'
-                }
-            ]
-        }
-    ]
-    payload['attachments'] = [attachments]
-    if test_only:
-        LOGGER.warning('[TEST-ONLY] Slack alert.')
-        LOGGER.warning(payload)
-        return True
-    response = SESSION.post(config.get('SLACK', 'WEBHOOK'), data=json.dumps(payload))
-    return response.ok
+    try:
+        payload = dict()
+        payload['channel'] = config.get('SLACK', 'CHANNEL')
+        payload['link_names'] = 1
+        payload['username'] = config.get('SLACK', 'USERNAME')
+        payload['icon_emoji'] = config.get('SLACK', 'EMOJI')
+        attachments = dict()
+        attachments['color'] = SLACK_COLOR_MAPPING[criticity]
+        attachments['blocks'] = [
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"{safe_url(content)}"
+                    }
+            },
+            {
+                "type": "actions",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "emoji": True,
+                            "text": "Tweet Link"
+                        },
+                        "style": "primary",
+                        "url": f'https://twitter.com/{author}/status/{id_tweet}'
+                    }
+                ]
+            }
+        ]
+        payload['attachments'] = [attachments]
+        if test_only:
+            LOGGER.warning('[TEST-ONLY] Slack alert.')
+            LOGGER.warning(payload)
+            return True
+        response = SESSION.post(config.get('SLACK', 'WEBHOOK'), data=json.dumps(payload))
+        return response
+    except Exception as ex:
+        LOGGER.debug(ex)
 
 def send_mail(to_email, content):
     '''Send a mail'''
-    message = MIMEMultipart("alternative")
-    message["Subject"] = config.get('MAIL', 'SUBJECT_EMAIL')
-    message["From"] = config.get('MAIL', 'SMTP_EMAIL')
-    message["To"] = to_email
+    try:
+        message = MIMEMultipart("alternative")
+        message["Subject"] = config.get('MAIL', 'SUBJECT_EMAIL')
+        message["From"] = config.get('MAIL', 'SMTP_EMAIL')
+        message["To"] = to_email
 
-    message.attach(MIMEText(content, "plain"))
+        message.attach(MIMEText(content, "plain"))
 
-    context = ssl.create_default_context()
-    with smtplib.SMTP_SSL(
-            config.get('MAIL', 'SMTP_SERVER'), config.get('MAIL', 'SMTP_PORT'),
-            context=context
-        ) as server:
-        server.login(config.get('MAIL', 'SMTP_EMAIL'), config.get('MAIL', 'SMTP_PASSWORD'))
-        server.sendmail(
-            config.get('MAIL', 'SMTP_EMAIL'), to_email, message.as_string()
-        )
+        context = ssl.create_default_context()
+        with smtplib.SMTP_SSL(
+                config.get('MAIL', 'SMTP_SERVER'), config.get('MAIL', 'SMTP_PORT'),
+                context=context
+            ) as server:
+            server.login(config.get('MAIL', 'SMTP_EMAIL'), config.get('MAIL', 'SMTP_PASSWORD'))
+            server.sendmail(
+                config.get('MAIL', 'SMTP_EMAIL'), to_email, message.as_string()
+            )
+    except Exception as ex:
+        LOGGER.debug(ex)
 
 def twitter_send_mail(json_data):
     '''Send mail if enabled in the config file'''
@@ -184,22 +191,22 @@ class TwitterListener(StreamListener):
 
 def main():
     '''Main, pass the exception if the streamer has failed to start due to network issues'''
-    try:
-        auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
-        auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
-        while True:
-            trademarks = ''
-            if not config.getboolean('STANDALONE', 'IS_ENABLED'):
-                for trademark in database.get_trademarks():
-                    trademarks += f"{trademark[1]}, "
-                trademarks = trademarks[:-2]
-            else:
-                trademarks = config.get('STANDALONE', 'TRADEMARKS')
-            LOGGER.warning(f"Twitter stream started with the trademarks: {trademarks} ...")
+    auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+    auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
+    while True:
+        trademarks = ''
+        if not config.getboolean('STANDALONE', 'IS_ENABLED'):
+            for trademark in database.get_trademarks():
+                trademarks += f"{trademark[1]}, "
+            trademarks = trademarks[:-2]
+        else:
+            trademarks = config.get('STANDALONE', 'TRADEMARKS')
+        LOGGER.warning(f"Twitter stream started with the trademarks: {trademarks} ...")
+        try:
             stream = Stream(auth, TwitterListener())
-            stream.filter(track=[trademarks])
-    except Exception:
-        pass
+            stream.filter(track=[trademarks], stall_warnings=True)
+        except Exception as ex:
+            LOGGER.debug(ex)
 
 if __name__ == '__main__':
     main()
