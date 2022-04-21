@@ -5,12 +5,11 @@ Trademark Monitor
 A tool to monitor specific keywords on social networks about trademarks.
 
 MIT License
-Copyright (c) 2021 Leboncoin
+Copyright (c) 2021-2022 Leboncoin
 Written by Yann Faure (yann.faure@adevinta.com)
 '''
 
 import json
-import time
 import smtplib
 import ssl
 import configparser
@@ -20,9 +19,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 from requests import Session
-import tweepy
 from tweepy import Stream
-from tweepy.streaming import StreamListener
 
 from classes.database import Database
 
@@ -164,7 +161,7 @@ def insert_tweet_to_database(json_data):
     LOGGER.warning(f"TWEET DATE: {json_data['created_at']}")
     LOGGER.warning(f"LINK: https://twitter.com/{json_data['user']['screen_name']}/status/{json_data['id']}")
 
-class TwitterListener(StreamListener):
+class TwitterListener(Stream):
     '''Class listening the data of the Twitter Stream'''
     def on_data(self, data):
         '''Receiving data'''
@@ -191,8 +188,6 @@ class TwitterListener(StreamListener):
 
 def main():
     '''Main, pass the exception if the streamer has failed to start due to network issues'''
-    auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
-    auth.set_access_token(ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
     while True:
         trademarks = ''
         if not config.getboolean('STANDALONE', 'IS_ENABLED'):
@@ -203,7 +198,9 @@ def main():
             trademarks = config.get('STANDALONE', 'TRADEMARKS')
         LOGGER.warning(f"Twitter stream started with the trademarks: {trademarks} ...")
         try:
-            stream = Stream(auth, TwitterListener())
+            stream = TwitterListener(
+                CONSUMER_KEY, CONSUMER_SECRET,
+                ACCESS_TOKEN, ACCESS_TOKEN_SECRET)
             stream.filter(track=[trademarks], stall_warnings=True)
         except Exception as ex:
             LOGGER.debug(ex)

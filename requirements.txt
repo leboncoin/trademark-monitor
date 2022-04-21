@@ -1,4 +1,4 @@
-tweepy>=3.10.0
-requests>=2.25.1
-Flask>=1.1.2
+tweepy>=4.7.0
+requests>=2.27.1
+Flask>=2.0.3
 Flask-Bootstrap4>=4.0.2
